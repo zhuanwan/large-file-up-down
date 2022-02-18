@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <input type="file" id="uploadBtn" />
+
+    <div style="margin-top: 100px">
+      <button id="testGet">测试xhr-get</button>
+      <button id="testPost">测试xhr-post</button>
+    </div>
+  </body>
+
+  <script type="module">
+    import request from './request.js'
+    const uploadBtn = document.getElementById('uploadBtn')
+    const chunkSize = 1 * 1024 * 1024 // 分片1M
+    let data = []
+
+    // 分片
+    function sliceFile(file) {
+      const chunks = []
+      let cur = 0
+      while (cur < file.size) {
+        chunks.push(file.slice(cur, cur + chunkSize))
+        cur += chunkSize
+      }
+      return chunks
+    }
+
+    // 合并文件
+    function mergeRequest(filename) {
+      request({
+        url: '/merge',
+        method: 'post',
+        data: JSON.stringify({
+          filename,
+          size: chunkSize,
+        }),
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+        },
+      }).then((res) => {
+        console.log(res)
+      })
+    }
+
+    // 开始上传
+    async function uploadChunks(data, file) {
+      const requestList = data.map(({ chunk, hash }) => {
+        const formData = new FormData()
+        formData.append('chunk', chunk)
+        formData.append('hash', hash)
+        formData.append('filename', file.name)
+        return request({
+          url: '/upload',
+          data: formData,
+        })
+      })
+
+      await Promise.all(requestList)
+      await mergeRequest(file.name)
+    }
+
+    // 选择文件
+    uploadBtn.onchange = function (e) {
+      const file = e.target.files[0]
+      const fileChunkList = sliceFile(file)
+      data = fileChunkList.map((chunk, index) => ({
+        chunk,
+        hash: `${file.name}-${index}`,
+      }))
+      uploadChunks(data, file)
+    }
+  </script>
+
+  <script type="module">
+    import request from './request.js'
+    const testPost = document.getElementById('testPost')
+    const testGet = document.getElementById('testGet')
+    testPost.onclick = function () {
+      request({
+        url: '/testPost',
+        method: 'post',
+        data: JSON.stringify({
+          a: 1,
+          b: 2,
+        }),
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+        },
+      }).then((res) => {
+        console.log(res)
+      })
+    }
+
+    testGet.onclick = function () {
+      request({
+        url: '/testGet',
+        method: 'get',
+        data: {
+          a: 3,
+          b: 4,
+        },
+      }).then((res) => {
+        console.log(res)
+      })
+    }
+  </script>
+</html>

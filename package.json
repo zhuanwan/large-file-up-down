@@ -1,0 +1,31 @@
+{
+  "name": "large-file-up-down",
+  "version": "1.0.0",
+  "description": "大文件上传和下载",
+  "main": "index.js",
+  "scripts": {
+    "start": "nodemon --exec babel-node src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhuanwan/large-file-up-down.git"
+  },
+  "author": "wh",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/zhuanwan/large-file-up-down/issues"
+  },
+  "homepage": "https://github.com/zhuanwan/large-file-up-down#readme",
+  "dependencies": {
+    "body-parser": "^1.19.1",
+    "cors": "^2.8.5",
+    "express": "^4.17.2",
+    "multiparty": "^4.2.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.17.2",
+    "@babel/node": "^7.16.8",
+    "@babel/preset-env": "^7.16.11",
+    "nodemon": "^2.0.15"
+  }
+}
