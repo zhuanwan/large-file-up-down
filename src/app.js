@@ -42,15 +42,15 @@ app.post('/upload', async (req, res) => {
   })
   form.parse(req, async (err, fields, files) => {
     const [chunk] = files.chunk
-    const [hash] = fields.hash
     const [filename] = fields.filename
+    const [index] = fields.index
     const chunkDir = path.resolve(UPLOADS_TEMP, filename)
 
     if (!fs.existsSync(chunkDir)) {
       await fs.mkdirSync(chunkDir)
     }
 
-    fs.rename(chunk.path, `${chunkDir}/${hash}`, (err) => {
+    fs.rename(chunk.path, `${chunkDir}/${index}`, (err) => {
       if (err) {
         console.log(err)
       }
@@ -88,7 +88,8 @@ async function mergeFileChunk(chunkDir, dest, size) {
   const chunkPaths = fs.readdirSync(chunkDir, (err) => {
     return err
   })
-  chunkPaths.sort((a, b) => a.split('-')[1] - b.split('-')[1])
+  // 读取文件排序
+  chunkPaths.sort((a, b) => a - b)
 
   // 先创建一个空文件
   fs.createWriteStream(dest)

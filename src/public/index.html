@@ -5,10 +5,31 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
+    <style>
+      .p-list {
+        list-style: none;
+      }
+      .p-list li {
+        display: flex;
+      }
+      .p-list li span {
+        width: 200px;
+      }
+    </style>
   </head>
   <body>
     <input type="file" id="uploadBtn" />
 
+    <div id="progress">
+      <div>总进度：</div>
+      <ul class="p-list">
+        <li>
+          <span>切片</span>
+          <span>大小</span>
+          <span>进度</span>
+        </li>
+      </ul>
+    </div>
     <div style="margin-top: 100px">
       <button id="testGet">测试xhr-get</button>
       <button id="testPost">测试xhr-post</button>
@@ -18,8 +39,11 @@
   <script type="module">
     import request from './request.js'
     const uploadBtn = document.getElementById('uploadBtn')
-    const chunkSize = 1 * 1024 * 1024 // 分片1M
+    const progressBox = document.getElementById('progress')
+    const chunkSize = 20 * 1024 * 1024 // 分片1M
     let data = []
+    let file = null
+    let totalPercentage = 0
 
     // 分片
     function sliceFile(file) {
@@ -40,6 +64,7 @@
         data: JSON.stringify({
           filename,
           size: chunkSize,
+          length: data.length,
         }),
         headers: {
           'Content-Type': 'application/json;charset=UTF-8',
@@ -49,16 +74,67 @@
       })
     }
 
+    // 渲染进度html
+    function renderProgress() {
+      const str = `
+        <div>总进度：${totalPercentage}</div>
+        <ul class="p-list">
+          <li>
+            <span>切片</span>
+            <span>大小</span>
+            <span>进度</span>
+          </li>
+          ${(function () {
+            return data
+              .map(
+                (item) => `
+            <li>
+              <span>${item.filename}-${item.index}</span>
+              <span>${item.size}</span>
+              <span>${item.percentage}</span>
+            </li>
+            `
+              )
+              .join('')
+          })()}
+        </ul>
+      `
+      progressBox.innerHTML = str
+    }
+
+    // 计算总的进度
+    function computedTotalPercent() {
+      if (!data.length || !file) {
+        return 0
+      }
+      const loaded = data
+        .map((item) => item.curSize || 0)
+        .reduce((acc, cur) => acc + cur)
+
+      return (loaded / file.size).toFixed(2)
+    }
+
+    // 计算进度
+    function createProgressHandler(item) {
+      return (e) => {
+        item.percentage = e.loaded / e.total
+        item.size = e.total
+        item.curSize = e.loaded
+        totalPercentage = computedTotalPercent()
+        renderProgress()
+      }
+    }
     // 开始上传
-    async function uploadChunks(data, file) {
-      const requestList = data.map(({ chunk, hash }) => {
+    async function uploadChunks() {
+      const requestList = data.map(({ chunk, index }) => {
         const formData = new FormData()
         formData.append('chunk', chunk)
-        formData.append('hash', hash)
         formData.append('filename', file.name)
+        formData.append('index', index)
         return request({
           url: '/upload',
           data: formData,
+          onprogress: createProgressHandler(data[index]),
         })
       })
 
@@ -68,13 +144,17 @@
 
     // 选择文件
     uploadBtn.onchange = function (e) {
-      const file = e.target.files[0]
+      file = e.target.files[0]
       const fileChunkList = sliceFile(file)
       data = fileChunkList.map((chunk, index) => ({
+        filename: file.name,
         chunk,
-        hash: `${file.name}-${index}`,
+        index,
+        size: 0,
+        curSize: 0,
+        percentage: 0,
       }))
-      uploadChunks(data, file)
+      uploadChunks()
     }
   </script>
 

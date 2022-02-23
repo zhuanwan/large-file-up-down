@@ -9,11 +9,13 @@ const parse = (data) => {
 const request = function({
   url,
   method = 'post',
+  onprogress = () => {},
   data,
   headers = {}
 }) {
   return new Promise(resolve => {
     const xhr = new XMLHttpRequest()
+    xhr.upload.onprogress = onprogress
     if (method === 'get') {
       console.log(parse(data))
       url = `${url}?${parse(data)}`
