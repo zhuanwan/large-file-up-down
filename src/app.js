@@ -30,8 +30,10 @@ app.post('/testPost', (req, res) => {
 const UPLOADS_TEMP = path.resolve(__dirname, 'src/uploads_temp') // 临时切片目录
 const UPLOADS = path.resolve(__dirname, 'src/uploads') // 最终上传目录
 
-app.post('/upload', async (req, res) => {
+const extractExt = (filename) =>
+  filename.slice(filename.lastIndexOf('.'), filename.length) // 提取后缀名
 
+app.post('/upload', async (req, res) => {
   if (!fs.existsSync(UPLOADS_TEMP)) {
     await fs.mkdirSync(UPLOADS_TEMP)
   }
@@ -44,7 +46,8 @@ app.post('/upload', async (req, res) => {
     const [chunk] = files.chunk
     const [filename] = fields.filename
     const [index] = fields.index
-    const chunkDir = path.resolve(UPLOADS_TEMP, filename)
+    const [fileHash] = fields.fileHash
+    const chunkDir = path.resolve(UPLOADS_TEMP, fileHash)
 
     if (!fs.existsSync(chunkDir)) {
       await fs.mkdirSync(chunkDir)
@@ -63,7 +66,7 @@ app.post('/upload', async (req, res) => {
  * 读取切片，写入
  * @param {*} path 切片地址
  * @param {*} writeStream 写入的流
- * @returns 
+ * @returns
  */
 const pipeStream = (path, writeStream) => {
   return new Promise((resolve) => {
@@ -79,10 +82,10 @@ const pipeStream = (path, writeStream) => {
 
 /**
  * 合并切片
- * @param {*} chunkDir /uploads_temp/test.jpg 文件夹
+ * @param {*} chunkDir /uploads_temp/test 文件夹
  * @param {*} dest /uploads/test.jpg 文件
  * @param {*} size 一份切片大小
- * @returns 
+ * @returns
  */
 async function mergeFileChunk(chunkDir, dest, size) {
   const chunkPaths = fs.readdirSync(chunkDir, (err) => {
@@ -114,20 +117,34 @@ async function mergeFileChunk(chunkDir, dest, size) {
 
 // 合并文件
 app.post('/merge', async (req, res) => {
-
   if (!fs.existsSync(UPLOADS)) {
     await fs.mkdirSync(UPLOADS)
   }
 
-  const { filename, size } = req.body
-  const chunkDir = path.resolve(UPLOADS_TEMP, filename)
-  const dest = path.resolve(UPLOADS, filename)
+  const { filename, size, fileHash } = req.body
+  const chunkDir = path.resolve(UPLOADS_TEMP, fileHash)
+  const dest = path.resolve(UPLOADS, `${fileHash}${extractExt(filename)}`)
 
   const err = await mergeFileChunk(chunkDir, dest, size)
   if (err) {
     res.send(err)
   } else {
     res.send('merged')
+  }
+})
+
+// 查找文件是否已经上传
+app.get('/verify', (req, res) => {
+  const { filename, fileHash } = req.query
+  const filePath = path.resolve(UPLOADS, `${fileHash}${extractExt(filename)}`)
+  if (fs.existsSync(filePath)) {
+    res.send({
+      shouldUpload: false,
+    })
+  } else {
+    res.send({
+      shouldUpload: true,
+    })
   }
 })
 

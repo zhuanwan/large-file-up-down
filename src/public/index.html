@@ -20,16 +20,9 @@
   <body>
     <input type="file" id="uploadBtn" />
 
-    <div id="progress">
-      <div>总进度：</div>
-      <ul class="p-list">
-        <li>
-          <span>切片</span>
-          <span>大小</span>
-          <span>进度</span>
-        </li>
-      </ul>
-    </div>
+    <div id="hashProgress" style="margin: 20px"></div>
+    <div id="progress" style="margin: 20px"></div>
+
     <div style="margin-top: 100px">
       <button id="testGet">测试xhr-get</button>
       <button id="testPost">测试xhr-post</button>
@@ -40,10 +33,13 @@
     import request from './request.js'
     const uploadBtn = document.getElementById('uploadBtn')
     const progressBox = document.getElementById('progress')
+    const hashProgressBox = document.getElementById('hashProgress')
+
     const chunkSize = 20 * 1024 * 1024 // 分片1M
     let data = []
     let file = null
     let totalPercentage = 0
+    let fileHash
 
     // 分片
     function sliceFile(file) {
@@ -65,6 +61,7 @@
           filename,
           size: chunkSize,
           length: data.length,
+          fileHash: fileHash,
         }),
         headers: {
           'Content-Type': 'application/json;charset=UTF-8',
@@ -126,11 +123,12 @@
     }
     // 开始上传
     async function uploadChunks() {
-      const requestList = data.map(({ chunk, index }) => {
+      const requestList = data.map(({ chunk, index, fileHash }) => {
         const formData = new FormData()
         formData.append('chunk', chunk)
         formData.append('filename', file.name)
         formData.append('index', index)
+        formData.append('fileHash', fileHash)
         return request({
           url: '/upload',
           data: formData,
@@ -142,12 +140,47 @@
       await mergeRequest(file.name)
     }
 
+    async function verifyUpload(filename, fileHash) {
+      const { data } = await request({
+        url: '/verify',
+        method: 'get',
+        data: {
+          filename,
+          fileHash,
+        },
+      })
+      return JSON.parse(data)
+    }
+    // 生成文件hash
+    function caculateHash(fileChunkList) {
+      return new Promise((resolve) => {
+        let worker = new Worker('./hash.js')
+        worker.postMessage({ fileChunkList })
+        worker.onmessage = (e) => {
+          const { percentage, hash } = e.data
+          hashProgressBox.innerHTML = `计算hash: ${percentage}`
+          if (hash) {
+            resolve(hash)
+          }
+        }
+      })
+    }
     // 选择文件
-    uploadBtn.onchange = function (e) {
+    uploadBtn.onchange = async function (e) {
       file = e.target.files[0]
+      const filename = file.name
       const fileChunkList = sliceFile(file)
+      fileHash = await caculateHash(fileChunkList)
+      // 先判断是否需要上传
+      const { shouldUpload } = await verifyUpload(filename, fileHash)
+      if (!shouldUpload) {
+        alert('已经上传成功')
+        return
+      }
+
       data = fileChunkList.map((chunk, index) => ({
-        filename: file.name,
+        filename,
+        fileHash,
         chunk,
         index,
         size: 0,

@@ -17,7 +17,6 @@ const request = function({
     const xhr = new XMLHttpRequest()
     xhr.upload.onprogress = onprogress
     if (method === 'get') {
-      console.log(parse(data))
       url = `${url}?${parse(data)}`
     }
     xhr.open(method, url)
