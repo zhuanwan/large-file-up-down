@@ -18,7 +18,11 @@
     </style>
   </head>
   <body>
-    <input type="file" id="uploadBtn" />
+    <input type="file" id="chooseFileBtn" />
+    <div style="margin-top: 10px">
+      <button id="uploadBtn">上传</button>
+      <button id="pasuseBtn">暂停</button>
+    </div>
 
     <div id="hashProgress" style="margin: 20px"></div>
     <div id="progress" style="margin: 20px"></div>
@@ -31,15 +35,18 @@
 
   <script type="module">
     import request from './request.js'
-    const uploadBtn = document.getElementById('uploadBtn')
+    const chooseFileBtn = document.getElementById('chooseFileBtn')
     const progressBox = document.getElementById('progress')
     const hashProgressBox = document.getElementById('hashProgress')
+    const pasuseBtn = document.getElementById('pasuseBtn')
+    const uploadBtn = document.getElementById('uploadBtn')
 
-    const chunkSize = 20 * 1024 * 1024 // 分片1M
+    const chunkSize = 5 * 1024 * 1024 // 分片1M
     let data = []
     let file = null
     let totalPercentage = 0
     let fileHash
+    let requestList = []
 
     // 分片
     function sliceFile(file) {
@@ -122,21 +129,27 @@
       }
     }
     // 开始上传
-    async function uploadChunks() {
-      const requestList = data.map(({ chunk, index, fileHash }) => {
+    async function uploadChunks(hasUploadList) {
+      const reqList = []
+      data.forEach(({ chunk, index, fileHash }) => {
         const formData = new FormData()
         formData.append('chunk', chunk)
         formData.append('filename', file.name)
         formData.append('index', index)
         formData.append('fileHash', fileHash)
-        return request({
-          url: '/upload',
-          data: formData,
-          onprogress: createProgressHandler(data[index]),
-        })
+        if (!hasUploadList.includes(String(index))) {
+          reqList.push(
+            request({
+              url: '/upload',
+              data: formData,
+              onprogress: createProgressHandler(data[index]),
+              requestList,
+            })
+          )
+        }
       })
 
-      await Promise.all(requestList)
+      await Promise.all(reqList)
       await mergeRequest(file.name)
     }
 
@@ -166,13 +179,25 @@
       })
     }
     // 选择文件
-    uploadBtn.onchange = async function (e) {
+    chooseFileBtn.onchange = async function (e) {
       file = e.target.files[0]
+    }
+
+    // 暂停
+    pasuseBtn.onclick = function () {
+      requestList.forEach((xhr) => xhr.abort())
+      requestList = []
+    }
+    // 继续上传
+    uploadBtn.onclick = async function () {
       const filename = file.name
       const fileChunkList = sliceFile(file)
       fileHash = await caculateHash(fileChunkList)
       // 先判断是否需要上传
-      const { shouldUpload } = await verifyUpload(filename, fileHash)
+      const { shouldUpload, hasUploadList } = await verifyUpload(
+        filename,
+        fileHash
+      )
       if (!shouldUpload) {
         alert('已经上传成功')
         return
@@ -183,11 +208,11 @@
         fileHash,
         chunk,
         index,
-        size: 0,
-        curSize: 0,
-        percentage: 0,
+        size: chunk.size,
+        curSize: chunk.size,
+        percentage: 1,
       }))
-      uploadChunks()
+      uploadChunks(hasUploadList)
     }
   </script>
 

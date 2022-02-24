@@ -142,8 +142,11 @@ app.get('/verify', (req, res) => {
       shouldUpload: false,
     })
   } else {
+    const chunkPath = path.resolve(UPLOADS_TEMP, `${fileHash}`)
+    const hasUploadList = fs.existsSync(chunkPath) ? fs.readdirSync(chunkPath) : []
     res.send({
       shouldUpload: true,
+      hasUploadList
     })
   }
 })

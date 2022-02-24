@@ -1,6 +1,6 @@
 # large-file-up-down
 大文件上传和下载
-
+参考：https://juejin.cn/post/6844904046436843527
 ### 运行
 npm run start  
 http://localhost:4001/public/index.html
@@ -14,3 +14,6 @@ http://localhost:4001/public/index.html
 ### v0.0.3
 1. 生成文件hash
 2. 已上传成功后重复上传提示
+### v0.0.4
+1. 断点续传
+
